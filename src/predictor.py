@@ -130,6 +130,81 @@ def calculate_uncertainty(
 
     return float(prediction_margin), bool(is_uncertain)
 
+# ---------------------------------------------------------
+# Shared prediction engine
+# ---------------------------------------------------------
+
+def _predict_reviews(
+    review_texts: list[str]
+) -> list[dict]:
+    """
+    Run sentiment prediction for one or more reviews.
+
+    This internal function contains the shared prediction
+    logic used by both single and batch prediction.
+    """
+
+    normalized_reviews = [
+        normalize_review(review)
+        for review in review_texts
+    ]
+
+    review_features = vectorizer.transform(
+        normalized_reviews
+    )
+
+    predictions = model.predict(
+        review_features
+    )
+
+    probability_matrix = model.predict_proba(
+        review_features
+    )
+
+    prediction_results = []
+
+    for row_index, predicted_sentiment in enumerate(
+        predictions
+    ):
+        probability_values = probability_matrix[
+            row_index
+        ]
+
+        class_probabilities = {
+            class_name: float(probability)
+            for class_name, probability in zip(
+                model.classes_,
+                probability_values
+            )
+        }
+
+        confidence = class_probabilities[
+            predicted_sentiment
+        ]
+
+        prediction_margin, is_uncertain = (
+            calculate_uncertainty(
+                probability_values
+            )
+        )
+
+        prediction_results.append({
+            "review": review_texts[row_index],
+            "normalized_review": normalized_reviews[
+                row_index
+            ],
+            "sentiment": predicted_sentiment,
+            "confidence": float(confidence),
+            "confidence_level": get_confidence_level(
+                confidence
+            ),
+            "prediction_margin": prediction_margin,
+            "is_uncertain": is_uncertain,
+            "probabilities": class_probabilities,
+        })
+
+    return prediction_results
+
 
 # ---------------------------------------------------------
 # Single-review prediction
@@ -142,52 +217,9 @@ def predict_sentiment(
     Predict sentiment for one review.
     """
 
-    normalized_review = normalize_review(
-        review_text
-    )
-
-    review_features = vectorizer.transform(
-        [normalized_review]
-    )
-
-    predicted_sentiment = model.predict(
-        review_features
+    return _predict_reviews(
+        [review_text]
     )[0]
-
-    probability_values = model.predict_proba(
-        review_features
-    )[0]
-
-    class_probabilities = {
-        class_name: float(probability)
-        for class_name, probability in zip(
-            model.classes_,
-            probability_values
-        )
-    }
-
-    confidence = class_probabilities[
-        predicted_sentiment
-    ]
-
-    prediction_margin, is_uncertain = (
-        calculate_uncertainty(
-            probability_values
-        )
-    )
-
-    return {
-        "review": review_text,
-        "normalized_review": normalized_review,
-        "sentiment": predicted_sentiment,
-        "confidence": float(confidence),
-        "confidence_level": get_confidence_level(
-            confidence
-        ),
-        "prediction_margin": prediction_margin,
-        "is_uncertain": is_uncertain,
-        "probabilities": class_probabilities
-    }
 
 
 # ---------------------------------------------------------
@@ -211,56 +243,46 @@ def predict_sentiment_batch(
             "At least one review is required."
         )
 
-    normalized_reviews = [
-        normalize_review(review)
-        for review in review_texts
-    ]
-
-    review_features = vectorizer.transform(
-        normalized_reviews
+    prediction_results = _predict_reviews(
+        review_texts
     )
 
-    predictions = model.predict(
-        review_features
+    flattened_results = []
+
+    for result in prediction_results:
+        flattened_result = {
+            "review": result["review"],
+            "normalized_review": result[
+                "normalized_review"
+            ],
+            "sentiment": result["sentiment"],
+        }
+
+        for class_name, probability in result[
+            "probabilities"
+        ].items():
+            flattened_result[
+                f"{class_name}_probability"
+            ] = probability
+
+        flattened_result.update({
+            "confidence": result["confidence"],
+            "confidence_level": result[
+                "confidence_level"
+            ],
+            "prediction_margin": result[
+                "prediction_margin"
+            ],
+            "is_uncertain": result[
+                "is_uncertain"
+            ],
+        })
+
+        flattened_results.append(
+            flattened_result
+        )
+
+    return pd.DataFrame(
+        flattened_results
     )
 
-    probability_matrix = model.predict_proba(
-        review_features
-    )
-
-    results = pd.DataFrame({
-        "review": review_texts,
-        "normalized_review": normalized_reviews,
-        "sentiment": predictions
-    })
-
-    for class_index, class_name in enumerate(
-        model.classes_
-    ):
-        results[
-            f"{class_name}_probability"
-        ] = probability_matrix[:, class_index]
-
-    results["confidence"] = probability_matrix.max(
-        axis=1
-    )
-
-    results["confidence_level"] = results[
-        "confidence"
-    ].apply(get_confidence_level)
-
-    sorted_probabilities = probability_matrix.copy()
-    sorted_probabilities.sort(axis=1)
-
-    results["prediction_margin"] = (
-        sorted_probabilities[:, -1]
-        - sorted_probabilities[:, -2]
-    )
-
-    results["is_uncertain"] = (
-        (results["confidence"] < 0.60)
-        |
-        (results["prediction_margin"] < 0.10)
-    )
-
-    return results
