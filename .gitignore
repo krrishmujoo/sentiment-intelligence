@@ -36,3 +36,10 @@ dist/
 
 # Logs
 *.log
+
+# Backup virtual environment
+.venv_import_problem_backup/
+
+# Local and generated datasets
+data/raw/reviews.csv
+data/processed/reviews_predictions.csv
