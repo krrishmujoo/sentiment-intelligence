@@ -10,16 +10,10 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = (
+PIPELINE_PATH = (
     PROJECT_ROOT
     / "models"
-    / "balanced_logreg_bigram.joblib"
-)
-
-VECTORIZER_PATH = (
-    PROJECT_ROOT
-    / "models"
-    / "tfidf_unigram_bigram.joblib"
+    / "final_sentiment_pipeline.joblib"
 )
 
 
@@ -27,14 +21,9 @@ VECTORIZER_PATH = (
 # Validate that saved artifacts exist
 # ---------------------------------------------------------
 
-if not MODEL_PATH.exists():
+if not PIPELINE_PATH.exists():
     raise FileNotFoundError(
-        f"Model file was not found: {MODEL_PATH}"
-    )
-
-if not VECTORIZER_PATH.exists():
-    raise FileNotFoundError(
-        f"Vectorizer file was not found: {VECTORIZER_PATH}"
+        f"Pipeline file was not found: {PIPELINE_PATH}"
     )
 
 
@@ -42,9 +31,9 @@ if not VECTORIZER_PATH.exists():
 # Load fitted model and vectorizer
 # ---------------------------------------------------------
 
-model = joblib.load(MODEL_PATH)
-vectorizer = joblib.load(VECTORIZER_PATH)
-
+pipeline = joblib.load(
+    PIPELINE_PATH
+)
 
 # ---------------------------------------------------------
 # Text preprocessing
@@ -149,16 +138,12 @@ def _predict_reviews(
         for review in review_texts
     ]
 
-    review_features = vectorizer.transform(
+    predictions = pipeline.predict(
+    normalized_reviews
+)
+
+    probability_matrix = pipeline.predict_proba(
         normalized_reviews
-    )
-
-    predictions = model.predict(
-        review_features
-    )
-
-    probability_matrix = model.predict_proba(
-        review_features
     )
 
     prediction_results = []
@@ -173,7 +158,7 @@ def _predict_reviews(
         class_probabilities = {
             class_name: float(probability)
             for class_name, probability in zip(
-                model.classes_,
+                pipeline.classes_,
                 probability_values
             )
         }
