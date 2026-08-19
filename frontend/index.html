@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Sentiment Analyzer</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 12px 18px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 25px;
+            display: none;
+        }
+
+        #error {
+            margin-top: 15px;
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Sentiment Analyzer</h1>
+
+        <p>
+            Enter an app review below.
+        </p>
+
+        <textarea
+            id="review"
+            placeholder="Example: I love this app, it works perfectly."
+        ></textarea>
+
+        <br>
+
+        <button id="analyze-button">
+            Analyze Sentiment
+        </button>
+
+        <div id="error"></div>
+
+        <div id="result">
+
+            <h2>
+                Sentiment:
+                <span id="sentiment"></span>
+            </h2>
+
+            <p>
+                Confidence:
+                <span id="confidence"></span>
+            </p>
+
+            <p>
+                Confidence level:
+                <span id="confidence-level"></span>
+            </p>
+
+            <p>
+                Negative:
+                <span id="negative"></span>
+            </p>
+
+            <p>
+                Neutral:
+                <span id="neutral"></span>
+            </p>
+
+            <p>
+                Positive:
+                <span id="positive"></span>
+            </p>
+
+            <p>
+                Uncertain:
+                <span id="uncertain"></span>
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        const button =
+            document.getElementById(
+                "analyze-button"
+            );
+
+
+        button.addEventListener(
+            "click",
+            async function () {
+
+                const review =
+                    document
+                        .getElementById("review")
+                        .value
+                        .trim();
+
+                const errorElement =
+                    document.getElementById(
+                        "error"
+                    );
+
+                const resultElement =
+                    document.getElementById(
+                        "result"
+                    );
+
+                errorElement.textContent = "";
+                resultElement.style.display =
+                    "none";
+
+
+                if (!review) {
+
+                    errorElement.textContent =
+                        "Please enter a review.";
+
+                    return;
+                }
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/predict",
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body: JSON.stringify({
+                                    review: review
+                                })
+                            }
+                        );
+
+
+                    const data =
+                        await response.json();
+
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            data.detail
+                            || "Prediction failed."
+                        );
+                    }
+
+
+                    document.getElementById(
+                        "sentiment"
+                    ).textContent =
+                        data.sentiment;
+
+
+                    document.getElementById(
+                        "confidence"
+                    ).textContent =
+                        (
+                            data.confidence * 100
+                        ).toFixed(1)
+                        + "%";
+
+
+                    document.getElementById(
+                        "confidence-level"
+                    ).textContent =
+                        data.confidence_level;
+
+
+                    document.getElementById(
+                        "negative"
+                    ).textContent =
+                        (
+                            data.probabilities
+                                .negative
+                            * 100
+                        ).toFixed(1)
+                        + "%";
+
+
+                    document.getElementById(
+                        "neutral"
+                    ).textContent =
+                        (
+                            data.probabilities
+                                .neutral
+                            * 100
+                        ).toFixed(1)
+                        + "%";
+
+
+                    document.getElementById(
+                        "positive"
+                    ).textContent =
+                        (
+                            data.probabilities
+                                .positive
+                            * 100
+                        ).toFixed(1)
+                        + "%";
+
+
+                    document.getElementById(
+                        "uncertain"
+                    ).textContent =
+                        data.is_uncertain
+                        ? "Yes"
+                        : "No";
+
+
+                    resultElement.style.display =
+                        "block";
+
+                }
+
+                catch (error) {
+
+                    errorElement.textContent =
+                        error.message;
+
+                }
+
+            }
+        );
+
+    </script>
+
+</body>
+</html>
