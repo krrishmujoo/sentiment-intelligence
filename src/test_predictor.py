@@ -122,9 +122,10 @@ def test_non_string_review_is_rejected():
         predict_sentiment(123)
 
 
-def test_batch_prediction_returns_dataframe():
+def test_batch_prediction_returns_list():
     """
-    Batch prediction should return one result per input review.
+    Batch prediction should return one dictionary
+    per input review.
     """
 
     reviews = [
@@ -133,56 +134,51 @@ def test_batch_prediction_returns_dataframe():
         "The app crashes every time",
     ]
 
-    results = predict_sentiment_batch(reviews)
+    results = predict_sentiment_batch(
+        reviews
+    )
 
-    assert isinstance(results, pd.DataFrame)
+    assert isinstance(results, list)
     assert len(results) == len(reviews)
-    assert results["review"].tolist() == reviews
 
+    returned_reviews = [
+        result["review"]
+        for result in results
+    ]
+
+    assert returned_reviews == reviews
 
 def test_batch_predictions_have_valid_sentiments():
-    """
-    Every batch result should contain a valid sentiment class.
-    """
-
     results = predict_sentiment_batch([
         "Excellent application",
         "It is average",
         "Completely unusable",
     ])
 
-    assert results["sentiment"].isin(
-        VALID_SENTIMENTS
-    ).all()
+    for result in results:
+        assert result["sentiment"] in (
+            VALID_SENTIMENTS
+        )
 
 
 def test_batch_probabilities_sum_to_one():
-    """
-    Each batch prediction's probabilities should total 1.
-    """
-
     results = predict_sentiment_batch([
         "Excellent app",
         "The experience was average",
         "This app is terrible",
     ])
 
-    probability_columns = [
-        "negative_probability",
-        "neutral_probability",
-        "positive_probability",
-    ]
-
-    probability_totals = results[
-        probability_columns
-    ].sum(axis=1)
-
-    for total in probability_totals:
-        assert total == pytest.approx(
+    for result in results:
+        assert math.isclose(
+            sum(
+                result[
+                    "probabilities"
+                ].values()
+            ),
             1.0,
-            abs=1e-6,
+            rel_tol=1e-6,
+            abs_tol=1e-6,
         )
-
 
 def test_batch_rejects_empty_list():
     """
@@ -219,8 +215,8 @@ def test_single_and_batch_predictions_are_consistent():
 
     single_result = predict_sentiment(review)
     batch_result = predict_sentiment_batch(
-        [review]
-    ).iloc[0]
+    [review]
+)[0]
 
     assert (
         single_result["sentiment"]

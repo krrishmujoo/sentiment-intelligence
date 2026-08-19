@@ -60,6 +60,7 @@ def predict_single(
 
 
 @app.post("/predict-batch")
+@app.post("/predict-batch")
 def predict_batch(
     request: BatchPredictionRequest
 ):
@@ -70,9 +71,7 @@ def predict_batch(
 
         return {
             "count": len(results),
-            "predictions": results.to_dict(
-                orient="records"
-            )
+            "predictions": results,
         }
 
     except (TypeError, ValueError) as error:

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import joblib
-import pandas as pd
 
 
 # ---------------------------------------------------------
@@ -213,9 +212,12 @@ def predict_sentiment(
 
 def predict_sentiment_batch(
     review_texts: list[str]
-) -> pd.DataFrame:
+) -> list[dict]:
     """
-    Predict sentiment for multiple reviews in one batch.
+    Predict sentiment for multiple reviews.
+
+    Returns one prediction dictionary per review using
+    the same schema as single-review prediction.
     """
 
     if not isinstance(review_texts, list):
@@ -228,46 +230,6 @@ def predict_sentiment_batch(
             "At least one review is required."
         )
 
-    prediction_results = _predict_reviews(
+    return _predict_reviews(
         review_texts
     )
-
-    flattened_results = []
-
-    for result in prediction_results:
-        flattened_result = {
-            "review": result["review"],
-            "normalized_review": result[
-                "normalized_review"
-            ],
-            "sentiment": result["sentiment"],
-        }
-
-        for class_name, probability in result[
-            "probabilities"
-        ].items():
-            flattened_result[
-                f"{class_name}_probability"
-            ] = probability
-
-        flattened_result.update({
-            "confidence": result["confidence"],
-            "confidence_level": result[
-                "confidence_level"
-            ],
-            "prediction_margin": result[
-                "prediction_margin"
-            ],
-            "is_uncertain": result[
-                "is_uncertain"
-            ],
-        })
-
-        flattened_results.append(
-            flattened_result
-        )
-
-    return pd.DataFrame(
-        flattened_results
-    )
-

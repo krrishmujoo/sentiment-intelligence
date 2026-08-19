@@ -207,13 +207,11 @@ def test_batch_predictions_have_valid_fields():
         "review",
         "normalized_review",
         "sentiment",
-        "negative_probability",
-        "neutral_probability",
-        "positive_probability",
         "confidence",
         "confidence_level",
         "prediction_margin",
         "is_uncertain",
+        "probabilities",
     }
 
     for prediction in predictions:
@@ -225,6 +223,13 @@ def test_batch_predictions_have_valid_fields():
             prediction["sentiment"]
             in VALID_SENTIMENTS
         )
+        assert set(
+        prediction["probabilities"].keys()
+            ) == {
+                "negative",
+                "neutral",
+                "positive",
+            }
 
 
 def test_batch_probabilities_sum_to_one():
@@ -249,20 +254,12 @@ def test_batch_probabilities_sum_to_one():
     for prediction in response.json()[
         "predictions"
     ]:
-        total = (
-            prediction[
-                "negative_probability"
-            ]
-            + prediction[
-                "neutral_probability"
-            ]
-            + prediction[
-                "positive_probability"
-            ]
-        )
-
         assert math.isclose(
-            total,
+            sum(
+                prediction[
+                    "probabilities"
+                ].values()
+            ),
             1.0,
             rel_tol=1e-6,
             abs_tol=1e-6,
