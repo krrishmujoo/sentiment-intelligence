@@ -324,124 +324,168 @@
         HELPER FUNCTIONS
         =====================================
         */
-function parseCsv(text) {
-
-    const rows = [];
-
-    let row = [];
-    let field = "";
-    let insideQuotes = false;
 
 
-    for (let i = 0; i < text.length; i++) {
+        function parseCsv(text) {
 
-        const character = text[i];
+            const rows = [];
+
+            let row = [];
+            let field = "";
+            let insideQuotes = false;
 
 
-        if (insideQuotes) {
+            for (
+                let i = 0;
+                i < text.length;
+                i++
+            ) {
 
-            if (character === '"') {
+                const character =
+                    text[i];
 
-                if (text[i + 1] === '"') {
 
-                    field += '"';
-                    i++;
+                if (insideQuotes) {
+
+                    if (character === '"') {
+
+                        /*
+                        Two quotation marks together:
+                        "" means one literal quote.
+                        */
+
+                        if (
+                            text[i + 1] === '"'
+                        ) {
+
+                            field += '"';
+
+                            i++;
+
+                        }
+
+                        else {
+
+                            insideQuotes = false;
+
+                        }
+
+                    }
+
+                    else {
+
+                        field += character;
+
+                    }
 
                 }
 
                 else {
 
-                    insideQuotes = false;
+                    if (character === '"') {
+
+                        insideQuotes = true;
+
+                    }
+
+                    else if (
+                        character === ","
+                    ) {
+
+                        row.push(
+                            field.trim()
+                        );
+
+                        field = "";
+
+                    }
+
+                    else if (
+                        character === "\n"
+                    ) {
+
+                        row.push(
+                            field.trim()
+                        );
+
+
+                        if (
+                            row.some(
+                                value =>
+                                    value !== ""
+                            )
+                        ) {
+
+                            rows.push(
+                                row
+                            );
+
+                        }
+
+
+                        row = [];
+                        field = "";
+
+                    }
+
+                    else if (
+                        character === "\r"
+                    ) {
+
+                        /*
+                        Ignore Windows carriage return.
+                        */
+
+                    }
+
+                    else {
+
+                        field += character;
+
+                    }
 
                 }
 
             }
 
-            else {
 
-                field += character;
+            if (insideQuotes) {
+
+                throw new Error(
+                    "CSV contains an unclosed quoted field."
+                );
 
             }
+
+
+            /*
+            Add final row when file does not
+            end with a newline.
+            */
+
+            row.push(
+                field.trim()
+            );
+
+
+            if (
+                row.some(
+                    value =>
+                        value !== ""
+                )
+            ) {
+
+                rows.push(
+                    row
+                );
+
+            }
+
+
+            return rows;
 
         }
 
-        else {
-
-            if (character === '"') {
-
-                insideQuotes = true;
-
-            }
-
-            else if (character === ",") {
-
-                row.push(field.trim());
-                field = "";
-
-            }
-
-            else if (character === "\n") {
-
-                row.push(field.trim());
-
-                if (
-                    row.some(
-                        value => value !== ""
-                    )
-                ) {
-
-                    rows.push(row);
-
-                }
-
-                row = [];
-                field = "";
-
-            }
-
-            else if (character === "\r") {
-
-                // Ignore Windows carriage returns.
-
-            }
-
-            else {
-
-                field += character;
-
-            }
-
-        }
-
-    }
-
-
-    if (insideQuotes) {
-
-        throw new Error(
-            "CSV contains an unclosed quoted field."
-        );
-
-    }
-
-
-    row.push(field.trim());
-
-
-    if (
-        row.some(
-            value => value !== ""
-        )
-    ) {
-
-        rows.push(row);
-
-    }
-
-
-    return rows;
-
-}
 
         function percent(value) {
 
@@ -458,25 +502,33 @@ function parseCsv(text) {
         ) {
 
             const row =
-                document.createElement("tr");
+                document.createElement(
+                    "tr"
+                );
 
 
             const reviewCell =
-                document.createElement("td");
+                document.createElement(
+                    "td"
+                );
 
             reviewCell.textContent =
                 prediction.review;
 
 
             const sentimentCell =
-                document.createElement("td");
+                document.createElement(
+                    "td"
+                );
 
             sentimentCell.textContent =
                 prediction.sentiment;
 
 
             const confidenceCell =
-                document.createElement("td");
+                document.createElement(
+                    "td"
+                );
 
             confidenceCell.textContent =
                 percent(
@@ -500,7 +552,9 @@ function parseCsv(text) {
             if (includeProbabilities) {
 
                 const negativeCell =
-                    document.createElement("td");
+                    document.createElement(
+                        "td"
+                    );
 
                 negativeCell.textContent =
                     percent(
@@ -511,7 +565,9 @@ function parseCsv(text) {
 
 
                 const neutralCell =
-                    document.createElement("td");
+                    document.createElement(
+                        "td"
+                    );
 
                 neutralCell.textContent =
                     percent(
@@ -522,7 +578,9 @@ function parseCsv(text) {
 
 
                 const positiveCell =
-                    document.createElement("td");
+                    document.createElement(
+                        "td"
+                    );
 
                 positiveCell.textContent =
                     percent(
@@ -548,7 +606,9 @@ function parseCsv(text) {
 
 
             const uncertainCell =
-                document.createElement("td");
+                document.createElement(
+                    "td"
+                );
 
             uncertainCell.textContent =
                 prediction.is_uncertain
@@ -991,7 +1051,8 @@ function parseCsv(text) {
         */
 
 
-        let latestCsvPredictions = [];
+        let latestCsvPredictions =
+            [];
 
 
         const csvButton =
@@ -1058,7 +1119,8 @@ function parseCsv(text) {
 
 
                 if (
-                    fileInput.files.length === 0
+                    fileInput.files.length
+                    === 0
                 ) {
 
                     csvError.textContent =
@@ -1075,72 +1137,104 @@ function parseCsv(text) {
 
                 try {
 
- const rows =
-    parseCsv(text);
+                    /*
+                    Read the uploaded CSV file
+                    into a text string.
+
+                    This was the missing line
+                    that caused:
+                    "text is not defined"
+                    */
+
+                    const text =
+                        await file.text();
 
 
-if (
-    rows.length < 2
-) {
+                    /*
+                    Parse the CSV safely.
+                    */
 
-    throw new Error(
-        "CSV must contain a header and at least one review."
-    );
-
-}
-
-
-const headers =
-    rows[0]
-        .map(
-            header =>
-                header
-                    .trim()
-                    .toLowerCase()
-        );
+                    const rows =
+                        parseCsv(
+                            text
+                        );
 
 
-const reviewIndex =
-    headers.indexOf(
-        "review"
-    );
+                    if (
+                        rows.length < 2
+                    ) {
+
+                        throw new Error(
+                            "CSV must contain a header and at least one review."
+                        );
+
+                    }
 
 
-if (
-    reviewIndex === -1
-) {
+                    /*
+                    Normalize column names.
+                    */
 
-    throw new Error(
-        'CSV must contain a column named "review".'
-    );
-
-}
-
-
-const reviews = [];
-
-
-for (
-    let i = 1;
-    i < rows.length;
-    i++
-) {
-
-    const review =
-        rows[i][
-            reviewIndex
-        ]?.trim();
+                    const headers =
+                        rows[0]
+                            .map(
+                                header =>
+                                    header
+                                        .trim()
+                                        .toLowerCase()
+                            );
 
 
-    if (review) {
+                    /*
+                    Find the review column.
+                    */
 
-        reviews.push(
-            review
-        );
+                    const reviewIndex =
+                        headers.indexOf(
+                            "review"
+                        );
 
-    }
 
-}
+                    if (
+                        reviewIndex === -1
+                    ) {
+
+                        throw new Error(
+                            'CSV must contain a column named "review".'
+                        );
+
+                    }
+
+
+                    /*
+                    Extract valid review text.
+                    */
+
+                    const reviews =
+                        [];
+
+
+                    for (
+                        let i = 1;
+                        i < rows.length;
+                        i++
+                    ) {
+
+                        const review =
+                            rows[i][
+                                reviewIndex
+                            ]?.trim();
+
+
+                        if (review) {
+
+                            reviews.push(
+                                review
+                            );
+
+                        }
+
+                    }
 
 
                     if (
@@ -1153,6 +1247,11 @@ for (
 
                     }
 
+
+                    /*
+                    Send all reviews through
+                    the existing batch API.
+                    */
 
                     const predictions =
                         await predictBatch(
@@ -1301,7 +1400,9 @@ for (
 
                 const blob =
                     new Blob(
-                        [csvContent],
+                        [
+                            csvContent
+                        ],
                         {
                             type:
                                 "text/csv;charset=utf-8;"
