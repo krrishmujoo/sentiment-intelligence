@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app import app
@@ -6,10 +8,15 @@ from app import app
 client = TestClient(app)
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
+FRONTEND_SRC = FRONTEND_DIR / "src"
+
+
 def test_frontend_homepage_loads():
     """
-    The root URL should successfully serve
-    the Sentiment Analyzer frontend.
+    The production application root should
+    successfully return HTML.
     """
 
     response = client.get("/")
@@ -21,120 +28,124 @@ def test_frontend_homepage_loads():
     ]
 
 
-def test_frontend_contains_main_title():
+def test_react_frontend_directory_exists():
     """
-    The frontend should contain the main
-    Sentiment Analyzer heading.
-    """
-
-    response = client.get("/")
-
-    assert response.status_code == 200
-
-    assert "Sentiment Analyzer" in response.text
-
-
-def test_frontend_connects_to_single_prediction_endpoint():
-    """
-    The frontend JavaScript should call
-    the single-prediction API.
+    The project should contain the React/Vite
+    frontend at the root frontend directory.
     """
 
-    response = client.get(
-        "/frontend/app.js"
+    assert FRONTEND_DIR.exists()
+
+    assert FRONTEND_DIR.is_dir()
+
+
+def test_react_package_json_exists():
+    """
+    The React project must contain its npm
+    package configuration.
+    """
+
+    package_json = (
+        FRONTEND_DIR / "package.json"
     )
 
-    assert response.status_code == 200
-
-    assert '"/predict"' in response.text
+    assert package_json.exists()
 
 
-def test_frontend_connects_to_batch_prediction_endpoint():
+def test_react_entrypoint_exists():
     """
-    Manual batch and CSV workflows should
-    call the batch prediction API.
+    React should have its main TypeScript
+    entrypoint.
     """
 
-    response = client.get(
-        "/frontend/app.js"
+    main_file = (
+        FRONTEND_SRC / "main.tsx"
     )
 
-    assert response.status_code == 200
-
-    assert '"/predict-batch"' in response.text
+    assert main_file.exists()
 
 
-def test_frontend_contains_csv_parser():
+def test_react_app_component_exists():
     """
-    The JavaScript bundle should contain
-    the custom CSV parser.
+    The main React App component should exist.
     """
 
-    response = client.get(
-        "/frontend/app.js"
+    app_file = (
+        FRONTEND_SRC / "App.tsx"
     )
 
-    assert response.status_code == 200
-
-    javascript = response.text
-
-    assert (
-        "function parseCsv(text)"
-        in javascript
-    )
-
-    assert (
-        "parseCsv("
-        in javascript
-    )
+    assert app_file.exists()
 
 
-def test_frontend_reads_uploaded_csv_file():
+def test_react_stylesheet_exists():
     """
-    Regression test for the bug where
-    parseCsv(text) was called before
-    the uploaded file had been read.
+    The React application should contain
+    its stylesheet.
     """
 
-    response = client.get(
-        "/frontend/app.js"
+    stylesheet = (
+        FRONTEND_SRC / "index.css"
     )
 
-    assert response.status_code == 200
-
-    javascript = response.text
-
-    assert (
-        "await file.text()"
-        in javascript
-    )
+    assert stylesheet.exists()
 
 
-def test_frontend_contains_csv_download_filename():
+def test_vite_configuration_exists():
     """
-    Prediction export should retain its
-    expected CSV filename.
+    Vite should provide the development
+    frontend configuration.
     """
 
-    response = client.get(
-        "/frontend/app.js"
+    vite_config = (
+        FRONTEND_DIR / "vite.config.ts"
     )
 
-    assert response.status_code == 200
+    assert vite_config.exists()
 
-    assert (
-        "sentiment_predictions.csv"
-        in response.text
-    )
+
+def test_vite_proxies_single_prediction_endpoint():
+    """
+    During development, Vite should proxy
+    single-review requests to FastAPI.
+    """
+
+    vite_config = (
+        FRONTEND_DIR / "vite.config.ts"
+    ).read_text()
+
+    assert "/predict" in vite_config
+
+
+def test_vite_proxies_batch_prediction_endpoint():
+    """
+    During development, Vite should proxy
+    batch-review requests to FastAPI.
+    """
+
+    vite_config = (
+        FRONTEND_DIR / "vite.config.ts"
+    ).read_text()
+
+    assert "/predict-batch" in vite_config
+
+
+def test_vite_proxies_health_endpoint():
+    """
+    React uses the health endpoint to
+    determine whether the model is online.
+    """
+
+    vite_config = (
+        FRONTEND_DIR / "vite.config.ts"
+    ).read_text()
+
+    assert "/health" in vite_config
+
 
 def test_existing_api_is_available_through_main_app():
     """
-    app.py imports and extends the same
-    FastAPI application used by src.api.
-
-    Therefore API routes must still work
-    when the application is launched through
-    app:app.
+    The main application must continue
+    exposing the existing FastAPI backend.
     """
 
     response = client.get("/health")
@@ -144,13 +155,14 @@ def test_existing_api_is_available_through_main_app():
     data = response.json()
 
     assert data["status"] == "healthy"
+
     assert data["model_loaded"] is True
 
 
 def test_single_prediction_works_through_main_app():
     """
-    Verify the main production application
-    exposes the working prediction backend.
+    The main application should expose
+    single-review sentiment inference.
     """
 
     response = client.post(
@@ -178,7 +190,9 @@ def test_single_prediction_works_through_main_app():
     )
 
     assert set(
-        prediction["probabilities"].keys()
+        prediction[
+            "probabilities"
+        ].keys()
     ) == {
         "negative",
         "neutral",
@@ -188,9 +202,8 @@ def test_single_prediction_works_through_main_app():
 
 def test_batch_prediction_works_through_main_app():
     """
-    Verify that the production application
-    exposes batch inference as expected by
-    both manual batch and CSV workflows.
+    The main application should expose
+    batch sentiment inference.
     """
 
     reviews = [
@@ -211,11 +224,18 @@ def test_batch_prediction_works_through_main_app():
     data = response.json()
 
     assert data["count"] == 3
-    assert len(data["predictions"]) == 3
 
-    for prediction in data["predictions"]:
+    assert len(
+        data["predictions"]
+    ) == 3
 
-        assert prediction["sentiment"] in {
+    for prediction in data[
+        "predictions"
+    ]:
+
+        assert prediction[
+            "sentiment"
+        ] in {
             "negative",
             "neutral",
             "positive",
@@ -230,99 +250,3 @@ def test_batch_prediction_works_through_main_app():
             "neutral",
             "positive",
         }
-
-def test_frontend_javascript_file_is_served():
-    """
-    FastAPI should serve the frontend
-    JavaScript file.
-    """
-
-    response = client.get(
-        "/frontend/app.js"
-    )
-
-    assert response.status_code == 200
-
-    assert (
-        "javascript"
-        in response.headers[
-            "content-type"
-        ]
-    )
-
-
-def test_frontend_stylesheet_is_served():
-    """
-    FastAPI should serve the frontend
-    stylesheet.
-    """
-
-    response = client.get(
-        "/frontend/style.css"
-    )
-
-    assert response.status_code == 200
-
-    assert (
-        "text/css"
-        in response.headers[
-            "content-type"
-        ]
-    )
-
-def test_frontend_contains_single_review_controls():
-    """
-    Single-review UI elements must exist.
-    """
-
-    response = client.get("/")
-
-    html = response.text
-
-    assert 'id="review"' in html
-    assert 'id="analyze-button"' in html
-    assert 'id="result"' in html
-
-    assert 'id="sentiment"' in html
-    assert 'id="confidence"' in html
-    assert 'id="confidence-level"' in html
-
-    assert 'id="negative"' in html
-    assert 'id="neutral"' in html
-    assert 'id="positive"' in html
-
-    assert 'id="uncertain"' in html
-
-
-def test_frontend_contains_batch_controls():
-    """
-    Batch-analysis UI elements must exist.
-    """
-
-    response = client.get("/")
-
-    html = response.text
-
-    assert 'id="batch-reviews"' in html
-    assert 'id="batch-button"' in html
-    assert 'id="batch-results"' in html
-    assert 'id="batch-table-body"' in html
-    assert 'id="batch-summary"' in html
-
-
-def test_frontend_contains_csv_controls():
-    """
-    CSV upload and download controls
-    must exist.
-    """
-
-    response = client.get("/")
-
-    html = response.text
-
-    assert 'id="csv-file"' in html
-    assert 'id="csv-button"' in html
-    assert 'id="csv-results"' in html
-    assert 'id="csv-table-body"' in html
-    assert 'id="csv-summary"' in html
-    assert 'id="download-button"' in html
