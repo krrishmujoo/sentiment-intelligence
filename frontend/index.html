@@ -324,7 +324,124 @@
         HELPER FUNCTIONS
         =====================================
         */
+function parseCsv(text) {
 
+    const rows = [];
+
+    let row = [];
+    let field = "";
+    let insideQuotes = false;
+
+
+    for (let i = 0; i < text.length; i++) {
+
+        const character = text[i];
+
+
+        if (insideQuotes) {
+
+            if (character === '"') {
+
+                if (text[i + 1] === '"') {
+
+                    field += '"';
+                    i++;
+
+                }
+
+                else {
+
+                    insideQuotes = false;
+
+                }
+
+            }
+
+            else {
+
+                field += character;
+
+            }
+
+        }
+
+        else {
+
+            if (character === '"') {
+
+                insideQuotes = true;
+
+            }
+
+            else if (character === ",") {
+
+                row.push(field.trim());
+                field = "";
+
+            }
+
+            else if (character === "\n") {
+
+                row.push(field.trim());
+
+                if (
+                    row.some(
+                        value => value !== ""
+                    )
+                ) {
+
+                    rows.push(row);
+
+                }
+
+                row = [];
+                field = "";
+
+            }
+
+            else if (character === "\r") {
+
+                // Ignore Windows carriage returns.
+
+            }
+
+            else {
+
+                field += character;
+
+            }
+
+        }
+
+    }
+
+
+    if (insideQuotes) {
+
+        throw new Error(
+            "CSV contains an unclosed quoted field."
+        );
+
+    }
+
+
+    row.push(field.trim());
+
+
+    if (
+        row.some(
+            value => value !== ""
+        )
+    ) {
+
+        rows.push(row);
+
+    }
+
+
+    return rows;
+
+}
 
         function percent(value) {
 
@@ -958,88 +1075,72 @@
 
                 try {
 
-                    const text =
-                        await file.text();
+ const rows =
+    parseCsv(text);
 
 
-                    const lines =
-                        text
-                            .split(/\r?\n/)
-                            .filter(
-                                line =>
-                                    line.trim()
-                                    !== ""
-                            );
+if (
+    rows.length < 2
+) {
+
+    throw new Error(
+        "CSV must contain a header and at least one review."
+    );
+
+}
 
 
-                    if (
-                        lines.length < 2
-                    ) {
-
-                        throw new Error(
-                            "CSV must contain a header and at least one review."
-                        );
-
-                    }
-
-
-                    const headers =
-                        lines[0]
-                            .split(",")
-                            .map(
-                                header =>
-                                    header
-                                        .trim()
-                                        .toLowerCase()
-                            );
+const headers =
+    rows[0]
+        .map(
+            header =>
+                header
+                    .trim()
+                    .toLowerCase()
+        );
 
 
-                    const reviewIndex =
-                        headers.indexOf(
-                            "review"
-                        );
+const reviewIndex =
+    headers.indexOf(
+        "review"
+    );
 
 
-                    if (
-                        reviewIndex === -1
-                    ) {
+if (
+    reviewIndex === -1
+) {
 
-                        throw new Error(
-                            'CSV must contain a column named "review".'
-                        );
+    throw new Error(
+        'CSV must contain a column named "review".'
+    );
 
-                    }
-
-
-                    const reviews = [];
+}
 
 
-                    for (
-                        let i = 1;
-                        i < lines.length;
-                        i++
-                    ) {
-
-                        const columns =
-                            lines[i]
-                                .split(",");
+const reviews = [];
 
 
-                        const review =
-                            columns[
-                                reviewIndex
-                            ]?.trim();
+for (
+    let i = 1;
+    i < rows.length;
+    i++
+) {
+
+    const review =
+        rows[i][
+            reviewIndex
+        ]?.trim();
 
 
-                        if (review) {
+    if (review) {
 
-                            reviews.push(
-                                review
-                            );
+        reviews.push(
+            review
+        );
 
-                        }
+    }
 
-                    }
+}
 
 
                     if (
