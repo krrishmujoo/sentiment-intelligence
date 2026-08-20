@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
@@ -18,7 +20,7 @@
         }
 
         .container {
-            max-width: 700px;
+            max-width: 900px;
             margin: 0 auto;
             background: white;
             padding: 30px;
@@ -45,9 +47,33 @@
             display: none;
         }
 
-        #error {
+        #error,
+        #batch-error {
             margin-top: 15px;
             color: red;
+        }
+
+        #batch-results {
+            margin-top: 25px;
+            display: none;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f3f3f3;
         }
     </style>
 </head>
@@ -56,7 +82,9 @@
 
     <div class="container">
 
-        <h1>Sentiment Analyzer</h1>
+        <h1>
+            Sentiment Analyzer
+        </h1>
 
         <p>
             Enter an app review below.
@@ -74,6 +102,9 @@
         </button>
 
         <div id="error"></div>
+
+
+        <!-- SINGLE REVIEW RESULT -->
 
         <div id="result">
 
@@ -114,10 +145,72 @@
 
         </div>
 
+
+        <!-- BATCH ANALYSIS -->
+
+        <hr style="margin: 40px 0;">
+
+
+        <h2>
+            Batch Analysis
+        </h2>
+
+        <p>
+            Enter one review per line.
+        </p>
+
+        <textarea
+            id="batch-reviews"
+            placeholder="Amazing app&#10;Terrible experience&#10;It works fine"
+        ></textarea>
+
+        <br>
+
+        <button id="batch-button">
+            Analyze Batch
+        </button>
+
+        <div id="batch-error"></div>
+
+
+        <!-- BATCH RESULTS -->
+
+        <div id="batch-results">
+
+            <h3>
+                Batch Results
+            </h3>
+
+            <table id="batch-table">
+
+                <thead>
+
+                    <tr>
+                        <th>Review</th>
+                        <th>Sentiment</th>
+                        <th>Confidence</th>
+                        <th>Uncertain</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="batch-table-body">
+                </tbody>
+
+            </table>
+
+        </div>
+
     </div>
 
 
     <script>
+
+        /*
+        ==============================
+        SINGLE REVIEW ANALYSIS
+        ==============================
+        */
 
         const button =
             document.getElementById(
@@ -127,25 +220,32 @@
 
         button.addEventListener(
             "click",
+
             async function () {
 
                 const review =
                     document
-                        .getElementById("review")
+                        .getElementById(
+                            "review"
+                        )
                         .value
                         .trim();
+
 
                 const errorElement =
                     document.getElementById(
                         "error"
                     );
 
+
                 const resultElement =
                     document.getElementById(
                         "result"
                     );
 
+
                 errorElement.textContent = "";
+
                 resultElement.style.display =
                     "none";
 
@@ -172,9 +272,12 @@
                                         "application/json"
                                 },
 
-                                body: JSON.stringify({
-                                    review: review
-                                })
+                                body:
+                                    JSON.stringify(
+                                        {
+                                            review: review
+                                        }
+                                    )
                             }
                         );
 
@@ -192,66 +295,84 @@
                     }
 
 
-                    document.getElementById(
-                        "sentiment"
-                    ).textContent =
-                        data.sentiment;
+                    document
+                        .getElementById(
+                            "sentiment"
+                        )
+                        .textContent =
+                            data.sentiment;
 
 
-                    document.getElementById(
-                        "confidence"
-                    ).textContent =
-                        (
-                            data.confidence * 100
-                        ).toFixed(1)
-                        + "%";
+                    document
+                        .getElementById(
+                            "confidence"
+                        )
+                        .textContent =
+                            (
+                                data.confidence
+                                * 100
+                            ).toFixed(1)
+                            + "%";
 
 
-                    document.getElementById(
-                        "confidence-level"
-                    ).textContent =
-                        data.confidence_level;
+                    document
+                        .getElementById(
+                            "confidence-level"
+                        )
+                        .textContent =
+                            data.confidence_level;
 
 
-                    document.getElementById(
-                        "negative"
-                    ).textContent =
-                        (
-                            data.probabilities
-                                .negative
-                            * 100
-                        ).toFixed(1)
-                        + "%";
+                    document
+                        .getElementById(
+                            "negative"
+                        )
+                        .textContent =
+                            (
+                                data
+                                    .probabilities
+                                    .negative
+                                * 100
+                            ).toFixed(1)
+                            + "%";
 
 
-                    document.getElementById(
-                        "neutral"
-                    ).textContent =
-                        (
-                            data.probabilities
-                                .neutral
-                            * 100
-                        ).toFixed(1)
-                        + "%";
+                    document
+                        .getElementById(
+                            "neutral"
+                        )
+                        .textContent =
+                            (
+                                data
+                                    .probabilities
+                                    .neutral
+                                * 100
+                            ).toFixed(1)
+                            + "%";
 
 
-                    document.getElementById(
-                        "positive"
-                    ).textContent =
-                        (
-                            data.probabilities
-                                .positive
-                            * 100
-                        ).toFixed(1)
-                        + "%";
+                    document
+                        .getElementById(
+                            "positive"
+                        )
+                        .textContent =
+                            (
+                                data
+                                    .probabilities
+                                    .positive
+                                * 100
+                            ).toFixed(1)
+                            + "%";
 
 
-                    document.getElementById(
-                        "uncertain"
-                    ).textContent =
-                        data.is_uncertain
-                        ? "Yes"
-                        : "No";
+                    document
+                        .getElementById(
+                            "uncertain"
+                        )
+                        .textContent =
+                            data.is_uncertain
+                                ? "Yes"
+                                : "No";
 
 
                     resultElement.style.display =
@@ -269,7 +390,228 @@
             }
         );
 
+
+        /*
+        ==============================
+        BATCH ANALYSIS
+        ==============================
+        */
+
+
+        const batchButton =
+            document.getElementById(
+                "batch-button"
+            );
+
+
+        batchButton.addEventListener(
+            "click",
+
+            async function () {
+
+                const batchText =
+                    document
+                        .getElementById(
+                            "batch-reviews"
+                        )
+                        .value
+                        .trim();
+
+
+                const batchError =
+                    document.getElementById(
+                        "batch-error"
+                    );
+
+
+                const batchResults =
+                    document.getElementById(
+                        "batch-results"
+                    );
+
+
+                const tableBody =
+                    document.getElementById(
+                        "batch-table-body"
+                    );
+
+
+                batchError.textContent = "";
+
+                batchResults.style.display =
+                    "none";
+
+                tableBody.innerHTML = "";
+
+
+                if (!batchText) {
+
+                    batchError.textContent =
+                        "Please enter at least one review.";
+
+                    return;
+                }
+
+
+                /*
+                Convert:
+
+                review 1
+                review 2
+                review 3
+
+                into:
+
+                [
+                    "review 1",
+                    "review 2",
+                    "review 3"
+                ]
+                */
+
+                const reviews =
+                    batchText
+                        .split("\n")
+                        .map(
+                            review =>
+                                review.trim()
+                        )
+                        .filter(
+                            review =>
+                                review.length > 0
+                        );
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/predict-batch",
+
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body:
+                                    JSON.stringify(
+                                        {
+                                            reviews: reviews
+                                        }
+                                    )
+                            }
+                        );
+
+
+                    const data =
+                        await response.json();
+
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            data.detail
+                            || "Batch prediction failed."
+                        );
+                    }
+
+
+                    for (
+                        const prediction
+                        of data.predictions
+                    ) {
+
+                        const row =
+                            document.createElement(
+                                "tr"
+                            );
+
+
+                        const reviewCell =
+                            document.createElement(
+                                "td"
+                            );
+
+                        reviewCell.textContent =
+                            prediction.review;
+
+
+                        const sentimentCell =
+                            document.createElement(
+                                "td"
+                            );
+
+                        sentimentCell.textContent =
+                            prediction.sentiment;
+
+
+                        const confidenceCell =
+                            document.createElement(
+                                "td"
+                            );
+
+                        confidenceCell.textContent =
+                            (
+                                prediction.confidence
+                                * 100
+                            ).toFixed(1)
+                            + "%";
+
+
+                        const uncertainCell =
+                            document.createElement(
+                                "td"
+                            );
+
+                        uncertainCell.textContent =
+                            prediction.is_uncertain
+                                ? "Yes"
+                                : "No";
+
+
+                        row.appendChild(
+                            reviewCell
+                        );
+
+                        row.appendChild(
+                            sentimentCell
+                        );
+
+                        row.appendChild(
+                            confidenceCell
+                        );
+
+                        row.appendChild(
+                            uncertainCell
+                        );
+
+
+                        tableBody.appendChild(
+                            row
+                        );
+                    }
+
+
+                    batchResults.style.display =
+                        "block";
+
+                }
+
+                catch (error) {
+
+                    batchError.textContent =
+                        error.message;
+
+                }
+
+            }
+        );
+
     </script>
 
 </body>
+
 </html>
