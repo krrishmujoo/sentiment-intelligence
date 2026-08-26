@@ -1,10 +1,16 @@
 from collections.abc import Sequence
 
+from src.intelligence.prioritization import (
+    calculate_priority_issues,
+)
 from src.intelligence.schemas import (
     BatchAnalyticsSummary,
     ReviewSignal,
     SentimentCounts,
     SentimentRates,
+)
+from src.intelligence.themes import (
+    calculate_theme_statistics,
 )
 
 
@@ -37,6 +43,15 @@ def calculate_batch_analytics(
     Calculate deterministic batch analytics from
     sentiment prediction results.
 
+    This includes:
+    - sentiment distribution
+    - confidence statistics
+    - uncertainty statistics
+    - local business-theme statistics
+    - deterministic issue prioritization
+    - representative high-confidence predictions
+    - ambiguous predictions
+
     No LLM is used here.
     """
 
@@ -44,25 +59,19 @@ def calculate_batch_analytics(
         predictions,
         Sequence,
     ):
-
         raise TypeError(
             "predictions must be a sequence"
         )
 
-
     if len(predictions) == 0:
-
         raise ValueError(
             "predictions must not be empty"
         )
 
-
     if ambiguous_limit < 1:
-
         raise ValueError(
             "ambiguous_limit must be at least 1"
         )
-
 
     signals = [
         _to_review_signal(
@@ -71,13 +80,11 @@ def calculate_batch_analytics(
         for prediction in predictions
     ]
 
-
     positive_signals = [
         signal
         for signal in signals
         if signal.sentiment == "positive"
     ]
-
 
     neutral_signals = [
         signal
@@ -85,18 +92,15 @@ def calculate_batch_analytics(
         if signal.sentiment == "neutral"
     ]
 
-
     negative_signals = [
         signal
         for signal in signals
         if signal.sentiment == "negative"
     ]
 
-
     total_reviews = len(
         signals
     )
-
 
     sentiment_counts = (
         SentimentCounts(
@@ -111,7 +115,6 @@ def calculate_batch_analytics(
             ),
         )
     )
-
 
     sentiment_rates = (
         SentimentRates(
@@ -130,24 +133,20 @@ def calculate_batch_analytics(
         )
     )
 
-
     uncertain_signals = [
         signal
         for signal in signals
         if signal.is_uncertain
     ]
 
-
     uncertain_count = len(
         uncertain_signals
     )
-
 
     uncertainty_rate = (
         uncertain_count
         / total_reviews
     )
-
 
     average_confidence = (
         sum(
@@ -157,28 +156,36 @@ def calculate_batch_analytics(
         / total_reviews
     )
 
+    theme_statistics = (
+        calculate_theme_statistics(
+            signals
+        )
+    )
+
+    priority_issues = (
+        calculate_priority_issues(
+            theme_statistics=theme_statistics,
+            total_reviews=total_reviews,
+        )
+    )
 
     most_confident_positive = None
 
     if positive_signals:
-
         most_confident_positive = max(
             positive_signals,
             key=lambda signal:
                 signal.confidence,
         )
 
-
     most_confident_negative = None
 
     if negative_signals:
-
         most_confident_negative = max(
             negative_signals,
             key=lambda signal:
                 signal.confidence,
         )
-
 
     ambiguous_signals = sorted(
         signals,
@@ -189,13 +196,11 @@ def calculate_batch_analytics(
         ),
     )
 
-
     most_ambiguous = (
         ambiguous_signals[
             :ambiguous_limit
         ]
     )
-
 
     return BatchAnalyticsSummary(
         total_reviews=total_reviews,
@@ -218,6 +223,14 @@ def calculate_batch_analytics(
 
         average_confidence=(
             average_confidence
+        ),
+
+        theme_statistics=(
+            theme_statistics
+        ),
+
+        priority_issues=(
+            priority_issues
         ),
 
         most_confident_positive=(

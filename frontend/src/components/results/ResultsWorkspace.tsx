@@ -6,6 +6,7 @@ import { SentimentDistribution } from "./SentimentDistribution";
 import { ReviewInsights } from "./ReviewInsights";
 import { ReviewExplorer } from "./ReviewExplorer";
 import { ExportCsvButton } from "./ExportCsvButton";
+import { BusinessInsightsPanel } from "../insights/BusinessInsightsPanel";
 
 interface ResultsWorkspaceProps {
   predictions: Prediction[];
@@ -29,6 +30,8 @@ export function ResultsWorkspace({ predictions, onExport }: ResultsWorkspaceProp
           <SentimentDistribution summary={summary} />
         </div>
       </Card>
+
+      <BusinessInsightsPanel predictions={predictions} />
 
       <Card className="p-6">
         <ReviewInsights predictions={predictions} />

@@ -1,4 +1,9 @@
-import type { BatchPredictionResponse, HealthResponse, Prediction } from "../types";
+import type {
+  AnalyzeResponse,
+  BatchPredictionResponse,
+  HealthResponse,
+  Prediction,
+} from "../types";
 
 export class ApiRequestError extends Error {
   status: number;
@@ -54,4 +59,17 @@ export async function predictBatch(reviews: string[]): Promise<BatchPredictionRe
   });
 
   return parseJsonOrThrow<BatchPredictionResponse>(response, "Batch prediction failed.");
+}
+
+export async function analyzeBusinessQuestion(
+  question: string,
+  predictions: Prediction[],
+): Promise<AnalyzeResponse> {
+  const response = await fetch("/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, predictions }),
+  });
+
+  return parseJsonOrThrow<AnalyzeResponse>(response, "Business insight generation failed.");
 }

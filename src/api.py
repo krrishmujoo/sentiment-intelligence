@@ -1,3 +1,15 @@
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from src.intelligence.claude_client import (
+    get_anthropic_client,
+)
+from src.intelligence.orchestrator import (
+    analyze_business_question,
+)
+from anthropic import APIConnectionError, APIError
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -16,6 +28,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
+class AnalyzeRequest(BaseModel):
+    question: str = Field(
+        min_length=1,
+        max_length=500,
+    )
+
+    predictions: list[dict]
 
 class SinglePredictionRequest(BaseModel):
     review: str = Field(
@@ -78,4 +97,45 @@ def predict_batch(
         raise HTTPException(
             status_code=400,
             detail=str(error)
+        ) from error
+
+@app.post("/analyze")
+def analyze_reviews(
+    request: AnalyzeRequest,
+) -> dict[str, Any]:
+    """
+    Run the privacy-safe business intelligence
+    pipeline on existing review predictions.
+    """
+
+    try:
+        client = get_anthropic_client()
+
+        return analyze_business_question(
+            user_question=request.question,
+            predictions=request.predictions,
+            client=client,
+        )
+
+    except (TypeError, ValueError) as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+    except APIConnectionError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "AI service is temporarily unavailable. "
+                "Please try again."
+            ),
+        ) from error
+
+    except APIError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "AI service returned an error. "
+                "Please try again."
+            ),
         ) from error

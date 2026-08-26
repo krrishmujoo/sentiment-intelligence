@@ -44,3 +44,6 @@ dist/
 data/raw/reviews.csv
 data/processed/reviews_predictions.csv
 .venv_bad_2026_08_19/
+
+.env
+.env.*

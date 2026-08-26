@@ -1,8 +1,12 @@
 import math
+from types import SimpleNamespace
+
+import src.api as api_module
 
 from fastapi.testclient import TestClient
 
 from src.api import app
+
 
 
 client = TestClient(app)
@@ -313,4 +317,164 @@ def test_unknown_endpoint_returns_404():
     )
 
     assert response.status_code == 404
+
+class SequencedMessages:
+    def __init__(self, responses):
+        self.responses = list(responses)
+
+    def create(self, **kwargs):
+        response_text = self.responses.pop(0)
+
+        return SimpleNamespace(
+            content=[
+                SimpleNamespace(
+                    text=response_text
+                )
+            ]
+        )
+
+
+class FakeClaudeClient:
+    def __init__(self, responses):
+        self.messages = SequencedMessages(
+            responses
+        )
+
+
+def sample_analyze_predictions():
+    return [
+        {
+            "review": "The app crashes and is very slow.",
+            "sentiment": "negative",
+            "confidence": 0.91,
+            "prediction_margin": 0.70,
+            "is_uncertain": False,
+        },
+        {
+            "review": "The app is useful but sometimes slow.",
+            "sentiment": "neutral",
+            "confidence": 0.52,
+            "prediction_margin": 0.08,
+            "is_uncertain": True,
+        },
+        {
+            "review": "The interface is easy to use.",
+            "sentiment": "positive",
+            "confidence": 0.90,
+            "prediction_margin": 0.72,
+            "is_uncertain": False,
+        },
+    ]
+
+
+def test_analyze_endpoint_success(
+    monkeypatch,
+):
+    planner_response = """
+    {
+      "intent": "identify_customer_problems",
+      "operations": [
+        {
+          "operation": "rank_priority_issues",
+          "limit": 5
+        }
+      ]
+    }
+    """
+
+    insight_response = """
+    {
+      "summary": "Performance is the main issue in this sample.",
+      "observations": [
+        {
+          "title": "Performance needs attention",
+          "description": "Performance appears in the supplied analytics.",
+          "evidence": [
+            "performance theme detected"
+          ]
+        }
+      ],
+      "recommendations": [
+        {
+          "title": "Investigate performance",
+          "action": "Review performance-related workflows.",
+          "rationale": "Performance carries negative sentiment.",
+          "priority": "high"
+        }
+      ]
+    }
+    """
+
+    fake_client = FakeClaudeClient(
+        [
+            planner_response,
+            insight_response,
+        ]
+    )
+
+    monkeypatch.setattr(
+        api_module,
+        "get_anthropic_client",
+        lambda: fake_client,
+    )
+
+    response = client.post(
+        "/analyze",
+        json={
+            "question": (
+                "What should the product team fix first?"
+            ),
+            "predictions": (
+                sample_analyze_predictions()
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert (
+        body["question"]
+        == "What should the product team fix first?"
+    )
+
+    assert (
+        body["plan"]["intent"]
+        == "identify_customer_problems"
+    )
+
+    assert "analytics" in body
+    assert "execution" in body
+    assert "insights" in body
+
+    assert (
+        body["insights"]["summary"]
+        == "Performance is the main issue in this sample."
+    )
+
+
+def test_analyze_endpoint_rejects_empty_question():
+    response = client.post(
+        "/analyze",
+        json={
+            "question": "",
+            "predictions": (
+                sample_analyze_predictions()
+            ),
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_analyze_endpoint_rejects_missing_predictions():
+    response = client.post(
+        "/analyze",
+        json={
+            "question": "What should we fix?"
+        },
+    )
+
+    assert response.status_code == 422
     
