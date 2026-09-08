@@ -1,24 +1,34 @@
 # Sentiment Intelligence
 
-**A privacy-aware customer feedback intelligence platform that turns reviews into sentiment, recurring themes, prioritized issues, and business recommendations.**
+**A privacy-aware review intelligence system that turns customer feedback into sentiment, recurring themes, prioritized issues, and business recommendations.**
 
-Sentiment Intelligence started as a traditional sentiment classification project, but I wanted to answer a more useful question than simply *“Is this review positive or negative?”*
+Sentiment Intelligence started as a straightforward sentiment classification project, but a binary "positive or negative" label isn't what a product team actually needs. They need to know what customers are struggling with, which problems come up most often, which issues are worth prioritizing, how much to trust a given prediction, and what to do next.
 
-Product teams usually want to know:
-
-- What are customers struggling with?
-- Which problems appear most often?
-- Which issues should be prioritized?
-- How confident is the model in its predictions?
-- What actions should the team consider next?
-
-The project therefore evolved into an end-to-end review intelligence system combining **local machine learning, deterministic analytics, constrained LLM planning, and AI-generated business insights.**
+This project answers those questions by combining a local machine learning classifier, deterministic analytics, constrained LLM planning, and AI-generated business insights into a single pipeline — with a hard boundary between the parts that compute facts and the parts that explain them.
 
 ---
 
-## What the system does
+## Table of Contents
 
-The application supports:
+- [What It Does](#what-it-does)
+- [Architecture](#architecture)
+- [Machine Learning](#machine-learning)
+- [Uncertainty Detection](#uncertainty-detection)
+- [Local Review Analytics](#local-review-analytics)
+- [Why Use an LLM at All?](#why-use-an-llm-at-all)
+- [Privacy-Aware Design](#privacy-aware-design)
+- [Technology Stack](#technology-stack)
+- [Testing](#testing)
+- [Engineering Lessons](#engineering-lessons)
+- [Current Limitations](#current-limitations)
+- [Future Improvements](#future-improvements)
+- [Getting Started](#getting-started)
+- [API Reference](#api-reference)
+- [Project Status](#project-status)
+
+---
+
+## What It Does
 
 - Single-review sentiment classification
 - Batch review analysis
@@ -26,19 +36,17 @@ The application supports:
 - Positive / neutral / negative classification
 - Confidence and prediction-margin analysis
 - Uncertainty detection
-- Theme extraction
-- Theme-level sentiment statistics
+- Theme extraction and theme-level sentiment statistics
 - Priority issue ranking
-- Natural-language business questions
-- Data-grounded observations
-- AI-generated recommendations
+- Natural-language business questions over the review data
+- Data-grounded observations, separated from AI-generated recommendations
 - Privacy-aware LLM usage
 
-### Example question
+**Example question:**
 
-> **What should the product team focus on first?**
+> What should the product team focus on first?
 
-The system determines which approved analytics operations are needed, calculates the underlying facts locally, and then generates a business-facing explanation from those facts.
+The system determines which approved analytics operations answer the question, calculates the underlying facts locally, and only then generates a business-facing explanation from those facts.
 
 ---
 
@@ -87,189 +95,107 @@ Claude Insight Engine
        │
        ▼
 React Dashboard
+```
 
-ML predicts. Python calculates. Claude plans. Python executes. Claude explains. Schemas constrain the boundaries.
+**ML predicts. Python calculates. Claude plans. Python executes. Claude explains.** Schemas constrain the boundary at every handoff.
 
-Machine Learning
+---
 
-The sentiment classifier uses:
+## Machine Learning
 
-TF-IDF features
-Unigrams and bigrams
-Balanced Logistic Regression
-Three sentiment classes:
-Positive
-Neutral
-Negative
+The sentiment classifier uses TF-IDF features (unigrams and bigrams) with a class-balanced Logistic Regression model, trained across three sentiment classes: positive, neutral, and negative.
 
-The training methodology uses a stratified 70 / 15 / 15 train-validation-test split.
+The training methodology uses a stratified 70/15/15 train/validation/test split, and the TF-IDF vectorizer is fit only on the training split to avoid data leakage. Several candidate models were evaluated before selecting the final one:
 
-The TF-IDF vectorizer is fitted only on the training split to avoid data leakage.
+- Balanced Logistic Regression with unigram + bigram TF-IDF
+- Balanced Logistic Regression with unigram TF-IDF
+- Balanced LinearSVC
+- Unweighted Logistic Regression
 
-Multiple candidate models were evaluated, including:
+The final model was selected using **validation macro-F1**, rather than accuracy alone, because the dataset is imbalanced and the neutral class is significantly harder to predict.
 
-Balanced Logistic Regression with unigram + bigram TF-IDF
-Balanced Logistic Regression with unigram TF-IDF
-Balanced LinearSVC
-Unweighted Logistic Regression
+### Locked test performance
 
-The final model was selected using validation macro-F1, rather than accuracy alone, because the dataset is imbalanced and the neutral class is significantly harder to predict.
+| Metric | Score |
+|---|---|
+| Accuracy | 70.28% |
+| Macro F1 | 63.63% |
+| Weighted F1 | 70.88% |
+| Negative F1 | 74.24% |
+| Neutral F1 | 35.89% |
+| Positive F1 | 80.76% |
 
-Locked test performance
-Metric	Score
-Accuracy	70.28%
-Macro F1	63.63%
-Weighted F1	70.88%
-Negative F1	74.24%
-Neutral F1	35.89%
-Positive F1	80.76%
+The neutral class remains the main weakness of the classifier. One reason is that labels are derived from star ratings rather than manually annotated textual sentiment — three-star reviews often contain mixed or ambiguous language. This limitation is reflected honestly in the system rather than hidden.
 
-The neutral class remains the main weakness of the classifier.
+---
 
-One reason is that labels are derived from star ratings rather than manually annotated textual sentiment. Three-star reviews often contain mixed or ambiguous language.
+## Uncertainty Detection
 
-This limitation is explicitly reflected in the system rather than hidden.
-
-Uncertainty
-
-The application does not treat every prediction as equally reliable.
-
-For every prediction it calculates:
-
-maximum class probability
-top-two probability margin
-confidence level
-uncertainty flag
+The application does not treat every prediction as equally reliable. For every prediction, it calculates the maximum class probability, the top-two probability margin, a confidence level, and an uncertainty flag.
 
 A prediction is currently marked uncertain when:
 
+```text
 confidence < 0.60
 OR
-top1 probability - top2 probability < 0.10
+top1_probability - top2_probability < 0.10
+```
 
 These values are heuristic confidence signals and should not be interpreted as calibrated probabilities of correctness.
 
-Local Review Analytics
+---
 
-Batch predictions are converted into deterministic analytics locally.
+## Local Review Analytics
 
-The analytics layer calculates:
+Batch predictions are converted into deterministic analytics locally. The analytics layer calculates sentiment counts, sentiment rates, average classifier confidence, uncertainty rate, theme-level sentiment, theme frequency, and priority issues.
 
-sentiment counts
-sentiment rates
-average classifier confidence
-uncertainty rate
-theme-level sentiment
-theme frequency
-priority issues
-Current theme taxonomy
+### Current theme taxonomy
 
-The deterministic theme layer currently detects areas such as:
+The deterministic theme layer currently detects areas such as crashes, performance, login/authentication, payments, customer support, UI/UX, features, ads, and notifications, using a lightweight keyword taxonomy. This makes the layer inexpensive, deterministic, private, and easy to test — but it can miss semantic variations and occasionally produce keyword-matching false positives. Semantic theme extraction is a future improvement, not something the current project claims to solve.
 
-crashes
-performance
-login / authentication
-payments
-customer support
-UI / UX
-features
-ads
-notifications
+### Priority scoring
 
-The current implementation uses a lightweight keyword taxonomy.
+Issues are prioritized using:
 
-This makes the layer inexpensive, deterministic, private, and easy to test, but it can miss semantic variations and occasionally produce keyword-matching false positives.
+```text
+priority_score = frequency_share × negative_rate
+```
 
-Semantic theme extraction is therefore a future improvement rather than something the current project claims to solve perfectly.
+This avoids automatically ranking a theme highly simply because one isolated mention is extremely negative. The score is intentionally simple and interpretable, and does not currently account for revenue impact, issue severity, customer segment value, trend velocity, or product criticality — natural extensions for a production system with richer metadata.
 
-Priority Scoring
+---
 
-Issues are currently prioritized using:
+## Why Use an LLM at All?
 
-priority_score =
-frequency_share × negative_rate
+The LLM is never responsible for calculating sentiment statistics. It's used in two constrained roles.
 
-This avoids automatically ranking a theme highly simply because one isolated mention is extremely negative.
+### 1. Analysis Planner
 
-The score is intentionally simple and interpretable.
+A user can ask a question like *"What are customers most unhappy about?"* Claude translates that question into a small set of approved analytical operations:
 
-It currently does not account for factors such as:
-
-revenue impact
-issue severity
-customer segment value
-trend velocity
-product criticality
-
-Those would be natural extensions for a production system with richer metadata.
-
-Why use an LLM?
-
-The LLM is not responsible for calculating sentiment statistics.
-
-Instead, it is used in two constrained roles.
-
-1. Analysis Planner
-
-A user can ask:
-
-“What are customers most unhappy about?”
-
-Claude translates that question into a small set of approved analytical operations such as:
-
+```json
 {
   "intent": "identify_top_customer_complaints",
   "operations": [
-    {
-      "operation": "filter_negative_themes",
-      "limit": 5
-    },
-    {
-      "operation": "rank_priority_issues",
-      "limit": 5
-    }
+    { "operation": "filter_negative_themes", "limit": 5 },
+    { "operation": "rank_priority_issues", "limit": 5 }
   ]
 }
+```
 
-The planner may only select from a predefined operation registry.
+The planner may only select from a predefined operation registry, and its output is validated with Pydantic before execution. It cannot execute arbitrary Python, shell commands, file operations, or database queries.
 
-Its output is validated using Pydantic before execution.
+### 2. Business Insight Engine
 
-The LLM cannot execute arbitrary Python, shell commands, file operations, or database queries.
+After the validated plan runs locally, a second LLM layer receives the deterministic aggregate facts and produces an executive summary, data-grounded observations, recommended actions, and a recommendation priority. The UI explicitly separates **data-grounded observations** from **AI-generated recommendations**, so a generated recommendation is never presented as a measured statistic.
 
-2. Business Insight Engine
+---
 
-After the validated plan is executed locally, the second LLM layer receives deterministic aggregate facts.
+## Privacy-Aware Design
 
-It produces:
+A core design goal was avoiding the simplest architecture — raw review dataset straight into an external LLM with an "analyze everything" prompt. Instead, the workflow is:
 
-an executive summary
-data-grounded observations
-recommended actions
-recommendation priority
-
-The UI explicitly separates:
-
-Data-Grounded Observations
-
-from
-
-AI-Generated Recommendations
-
-This prevents generated recommendations from being presented as measured statistics.
-
-Privacy-Aware Design
-
-A major design goal was avoiding the simplest architecture:
-
-raw review dataset
-      ↓
-external LLM
-      ↓
-"analyze everything"
-
-Instead, the aggregate intelligence workflow uses:
-
+```text
 Raw reviews
     ↓
 Local ML + analytics
@@ -277,189 +203,126 @@ Local ML + analytics
 Privacy-safe aggregate representation
     ↓
 LLM reasoning
+```
 
-The planner receives only:
+The planner receives only the user's business question and descriptions of approved operations. The business insight engine receives only structured aggregate/executor facts. The full raw review dataset is never sent to Claude in this workflow — this is enforced structurally through the `InsightPacket` schema and covered by automated tests.
 
-the user's business question
-descriptions of approved operations
+---
 
-The business insight engine receives only structured aggregate/executor facts.
+## Technology Stack
 
-The full raw review dataset is not sent to Claude in this workflow.
+| Layer | Technologies |
+|---|---|
+| Machine Learning | Python, pandas, NumPy, scikit-learn, TF-IDF, Logistic Regression, joblib |
+| Backend | FastAPI, Pydantic, Uvicorn |
+| AI Intelligence | Anthropic Claude, constrained planner, whitelisted operations, structured response validation, deterministic local executor |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, Recharts, Framer Motion, Lucide |
+| Testing | pytest, FastAPI TestClient, Vitest, Playwright |
 
-This is enforced structurally through the InsightPacket schema and tested automatically.
+---
 
-Technology Stack
-Machine Learning
-Python
-pandas
-NumPy
-scikit-learn
-TF-IDF
-Logistic Regression
-joblib
-Backend
-FastAPI
-Pydantic
-Uvicorn
-AI Intelligence
-Anthropic Claude
-constrained planner
-whitelisted operations
-structured response validation
-deterministic local executor
-Frontend
-React
-TypeScript
-Vite
-Tailwind CSS
-Recharts
-Framer Motion
-Lucide
-Testing
-pytest
-FastAPI TestClient
-Vitest
-Playwright
-Testing
+## Testing
 
 The project includes automated tests across the ML, backend, analytics, LLM integration, and frontend layers.
 
-Current full regression baseline:
+**Current full regression baseline: 114 tests passed.**
 
-114 tests passed
+Coverage includes sentiment prediction, batch prediction, uncertainty logic, API validation, CSV parsing, analytics, theme extraction, priority scoring, privacy-safe `InsightPacket` construction, planner validation, unsafe-operation rejection, the planner executor, the Claude planner and insight adapters, `/analyze` orchestration, frontend behavior, and end-to-end browser workflows.
 
-Coverage includes:
+Anthropic calls are mocked in automated tests so test runs don't depend on external API availability or consume API credits. Real integration calls were tested separately during development.
 
-sentiment prediction
-batch prediction
-uncertainty logic
-API validation
-CSV parsing
-analytics
-theme extraction
-priority scoring
-privacy-safe InsightPacket construction
-planner validation
-unsafe operation rejection
-planner executor
-Claude planner adapter
-Claude insight adapter
-orchestration
-/analyze
-frontend behavior
-end-to-end browser workflows
+---
 
-Anthropic calls are mocked in automated tests so test runs do not depend on external API availability or consume API credits.
+## Engineering Lessons
 
-Real integration calls were also tested separately during development.
+Several implementation issues shaped the final architecture, including:
 
-Engineering Lessons
+- Rebuilding a corrupted Python environment
+- Preventing data leakage during model training
+- Fixing duplicate Git repository initialization
+- Migrating the frontend to React
+- Stabilizing Playwright end-to-end tests
+- Validating LLM-generated JSON
+- Handling Markdown-wrapped model responses
+- Handling multiple Anthropic content block types
+- Distinguishing mocked API behavior from real integration behavior
+- Handling external API connection failures
+- Detecting truncated LLM responses using `stop_reason`
+- Tuning output-token budgets
+- Reducing unnecessary LLM verbosity
 
-Several implementation issues shaped the final architecture.
+These failures were useful — they forced the system to become more explicit and defensive rather than relying on ideal API behavior.
 
-Some examples include:
+---
 
-rebuilding a corrupted Python environment
-preventing data leakage during model training
-fixing duplicate Git repository initialization
-migrating the frontend to React
-stabilizing Playwright E2E tests
-validating LLM-generated JSON
-handling Markdown-wrapped model responses
-handling multiple Anthropic content block types
-distinguishing mocked API behavior from real integration behavior
-handling external API connection failures
-detecting truncated LLM responses using stop_reason
-tuning output-token budgets
-reducing unnecessary LLM verbosity
-
-These failures were useful because they forced the system to become more explicit and defensive rather than relying on ideal API behavior.
-
-Current Limitations
+## Current Limitations
 
 The current version deliberately has several known limitations:
 
-Neutral sentiment remains difficult
-Neutral F1 is significantly lower than positive and negative performance.
-Theme extraction is keyword based
-It does not yet provide semantic topic discovery.
-Priority scoring is heuristic
-It measures frequency and negativity but not business impact.
-Sentiment probabilities are not calibrated
-Confidence values should not be interpreted as true correctness probabilities.
-Trend analysis requires richer metadata
-Time, app version, region, customer segment, and product metadata would enable stronger analysis.
-LLM token usage can be further optimized
-Aggregate payload deduplication is a planned improvement.
-Future Improvements
+- **Neutral sentiment remains difficult.** Neutral F1 is significantly lower than positive and negative performance.
+- **Theme extraction is keyword-based.** It does not yet provide semantic topic discovery.
+- **Priority scoring is heuristic.** It measures frequency and negativity, not business impact.
+- **Sentiment probabilities are not calibrated.** Confidence values should not be interpreted as true correctness probabilities.
+- **Trend analysis needs richer metadata.** Time, app version, region, customer segment, and product metadata would enable stronger analysis.
+- **LLM token usage can be further optimized.** Aggregate payload deduplication is a planned improvement.
 
-Potential extensions include:
+---
 
-semantic theme extraction
-embedding-based clustering
-transformer sentiment models
-calibrated confidence scores
-aspect-based sentiment analysis
-trend analysis
-app-version comparison
-customer-segment analysis
-richer business-priority models
-reduced LLM token usage through compact aggregate payloads
+## Future Improvements
+
+Potential extensions include semantic theme extraction, embedding-based clustering, transformer sentiment models, calibrated confidence scores, aspect-based sentiment analysis, trend analysis, app-version comparison, customer-segment analysis, richer business-priority models, and reduced LLM token usage through compact aggregate payloads.
 
 The current version intentionally prioritizes a stable, interpretable, and testable architecture over adding every possible feature.
 
-Running Locally
-Backend
+---
+
+## Getting Started
+
+### Backend
+
+```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
 uvicorn src.api:app --reload --port 8000
+```
 
-FastAPI runs at:
+FastAPI runs at `http://127.0.0.1:8000`, with interactive API docs at `http://127.0.0.1:8000/docs`.
 
-http://127.0.0.1:8000
+### Environment
 
-API documentation:
+Create a `.env` file and configure:
 
-http://127.0.0.1:8000/docs
-Environment
-
-Create:
-
-.env
-
-and configure:
-
+```env
 ANTHROPIC_API_KEY=your_key_here
+```
 
-Never commit .env.
+Never commit `.env`.
 
-Frontend
+### Frontend
+
+```bash
 cd frontend
 npm install
 npm run dev
+```
 
-Frontend runs at:
+The frontend runs at `http://localhost:5173`.
 
-http://localhost:5173
-API
+---
 
-Main endpoints:
+## API Reference
 
-GET  /health
-POST /predict
-POST /predict-batch
-POST /analyze
-Project Status
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `POST` | `/predict` | Single-review sentiment prediction |
+| `POST` | `/predict-batch` | Batch review prediction |
+| `POST` | `/analyze` | Natural-language business question → planned analysis → insights |
 
-The current release contains the complete core sentiment and review-intelligence pipeline.
+---
 
-The next focus areas are:
+## Project Status
 
-production deployment
-documentation refinement
-LLM payload optimization
-additional model/theme improvements
-
+The current release contains the complete core sentiment and review-intelligence pipeline. Next focus areas: production deployment, documentation refinement, LLM payload optimization, and additional model/theme improvements.
